@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>情感分析系统 - LSTM vs Transformer vs BERT</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .input-section {
+            flex: 1;
+            min-width: 350px;
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .input-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+            padding-left: 15px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            resize: vertical;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .example-buttons {
+            margin: 15px 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .example-btn {
+            background: #f0f0f0;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .example-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .predict-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 15px;
+        }
+
+        .predict-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .results-section {
+            flex: 2;
+            min-width: 500px;
+        }
+
+        .model-card {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            transition: transform 0.3s;
+        }
+
+        .model-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .model-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .model-name.lstm { color: #2E86AB; font-size: 1.4rem; font-weight: bold; }
+        .model-name.transformer { color: #A23B72; font-size: 1.4rem; font-weight: bold; }
+        .model-name.bert { color: #F18F01; font-size: 1.4rem; font-weight: bold; }
+
+        .model-accuracy {
+            background: #f0f0f0;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .result-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .sentiment-badge {
+            font-size: 1.5rem;
+            font-weight: bold;
+            padding: 10px 25px;
+            border-radius: 50px;
+        }
+
+        .sentiment-badge.positive {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .sentiment-badge.negative {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .confidence {
+            text-align: right;
+        }
+
+        .confidence-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .confidence-label {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .progress-bar {
+            width: 200px;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .progress-fill.positive { background: #28a745; width: 0%; height: 100%; transition: width 0.5s ease; }
+        .progress-fill.negative { background: #dc3545; width: 0%; height: 100%; transition: width 0.5s ease; }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            padding: 20px;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 900px) {
+            .main-content {
+                flex-direction: column;
+            }
+            .results-section {
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎭 情感分析系统</h1>
+            <p>LSTM vs Transformer vs BERT - 三模型实时对比</p>
+        </div>
+
+        <div class="main-content">
+            <div class="input-section">
+                <h2>📝 输入文本</h2>
+                <textarea id="inputText" placeholder="请输入要分析的英文评论...&#10;&#10;例如：&#10;This movie is absolutely fantastic! I love it!&#10;The acting was terrible and the plot was boring."></textarea>
+
+                <div class="example-buttons">
+                    <button class="example-btn" onclick="setExample('positive')">👍 正面示例</button>
+                    <button class="example-btn" onclick="setExample('negative')">👎 负面示例</button>
+                    <button class="example-btn" onclick="setExample('neutral')">🤔 中性示例</button>
+                </div>
+
+                <button class="predict-btn" onclick="predict()">🔍 开始分析</button>
+            </div>
+
+            <div class="results-section" id="resultsSection">
+                <div class="loading" id="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 15px;">分析中...</p>
+                </div>
+
+                <div class="model-card" id="lstmCard" style="display: none;">
+                    <div class="model-header">
+                        <span class="model-name lstm">🧠 LSTM</span>
+                        <span class="model-accuracy">准确率: 87.29%</span>
+                    </div>
+                    <div class="result-content">
+                        <div class="sentiment-badge" id="lstmSentiment">-</div>
+                        <div class="confidence">
+                            <div class="confidence-value" id="lstmConfidence">-</div>
+                            <div class="confidence-label">置信度</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="lstmProgress"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="model-card" id="transformerCard" style="display: none;">
+                    <div class="model-header">
+                        <span class="model-name transformer">⚡ Transformer</span>
+                        <span class="model-accuracy">准确率: 85.15%</span>
+                    </div>
+                    <div class="result-content">
+                        <div class="sentiment-badge" id="transformerSentiment">-</div>
+                        <div class="confidence">
+                            <div class="confidence-value" id="transformerConfidence">-</div>
+                            <div class="confidence-label">置信度</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="transformerProgress"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="model-card" id="bertCard" style="display: none;">
+                    <div class="model-header">
+                        <span class="model-name bert">🤗 BERT</span>
+                        <span class="model-accuracy">准确率: 87.63%</span>
+                    </div>
+                    <div class="result-content">
+                        <div class="sentiment-badge" id="bertSentiment">-</div>
+                        <div class="confidence">
+                            <div class="confidence-value" id="bertConfidence">-</div>
+                            <div class="confidence-label">置信度</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="bertProgress"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>基于 IMDB 数据集训练 | RTX 4060 GPU 加速 | 深度学习期末综合实践项目</p>
+        </div>
+    </div>
+
+    <script>
+        const examples = {
+            positive: "This movie is absolutely fantastic! The acting was superb and the story kept me on the edge of my seat. I would definitely recommend it to everyone!",
+            negative: "This movie was a complete disaster. The acting was terrible, the plot made no sense, and I regret wasting my time and money on it.",
+            neutral: "This movie is okay. It has some good parts and some bad parts. I'm not sure if I would recommend it or not."
+        };
+
+        function setExample(type) {
+            document.getElementById('inputText').value = examples[type];
+            predict();
+        }
+
+        async function predict() {
+            const text = document.getElementById('inputText').value.trim();
+
+            if (!text) {
+                alert('请输入文本内容');
+                return;
+            }
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('lstmCard').style.display = 'none';
+            document.getElementById('transformerCard').style.display = 'none';
+            document.getElementById('bertCard').style.display = 'none';
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                });
+
+                const results = await response.json();
+                document.getElementById('loading').style.display = 'none';
+
+                if (results.lstm) updateResultCard('lstm', results.lstm);
+                if (results.transformer) updateResultCard('transformer', results.transformer);
+                if (results.bert) updateResultCard('bert', results.bert);
+
+            } catch (error) {
+                console.error('预测失败:', error);
+                document.getElementById('loading').style.display = 'none';
+                alert('预测失败，请检查后端服务是否正常运行');
+            }
+        }
+
+        function updateResultCard(model, result) {
+            const sentimentEl = document.getElementById(`${model}Sentiment`);
+            const confidenceEl = document.getElementById(`${model}Confidence`);
+            const progressEl = document.getElementById(`${model}Progress`);
+            const card = document.getElementById(`${model}Card`);
+
+            const isPositive = result.sentiment === '正面';
+            const confidencePercent = (result.confidence * 100).toFixed(1);
+
+            sentimentEl.textContent = result.sentiment;
+            sentimentEl.className = `sentiment-badge ${isPositive ? 'positive' : 'negative'}`;
+
+            confidenceEl.textContent = `${confidencePercent}%`;
+            progressEl.style.width = `${confidencePercent}%`;
+            progressEl.className = `progress-fill ${isPositive ? 'positive' : 'negative'}`;
+
+            card.style.display = 'block';
+        }
+
+        window.onload = () => {
+            document.getElementById('inputText').value = examples.positive;
+            predict();
+        };
+    </script>
+</body>
+</html>
